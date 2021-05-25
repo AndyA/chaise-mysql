@@ -51,19 +51,19 @@ class Session {
     );
   }
 
-  getStartSequence() {
-    const seqs = Object.values(this.viewState).sort((a, b) =>
-      cmp(seqNum(a), seqNum(b))
-    );
-    return seqs.length ? seqs[0] : "0";
-  }
-
   async setViewState(id, seq) {
     await this.mdb.query(
       "REPLACE INTO `_chaise_view_state` (`view_id`, `couch_seq`) VALUES (?, ?)",
       [id, seq]
     );
     this.viewState[id] = seq;
+  }
+
+  getStartSequence() {
+    const seqs = Object.values(this.viewState).sort((a, b) =>
+      cmp(seqNum(a), seqNum(b))
+    );
+    return seqs.length ? seqs[0] : "0";
   }
 
   async handleBatch(batch, seq) {
