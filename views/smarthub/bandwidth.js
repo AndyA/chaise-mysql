@@ -10,6 +10,7 @@ module.exports = {
         for (const { time, rate } of stats) {
           for (const r of rate) {
             const { mac, tx_rate, rx_rate } = r;
+            if (/,/.test(mac)) throw new Error(`Multimac`);
             if (mac && tx_rate !== undefined && rx_rate !== undefined)
               this.emit({ time, mac, tx_rate, rx_rate });
           }
