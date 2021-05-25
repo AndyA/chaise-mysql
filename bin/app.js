@@ -8,7 +8,7 @@ const fg = require("fast-glob");
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-const ps = seq => {
+const seqNum = seq => {
   if (!seq) return 0;
   const m = seq.match(/^(\d+)-/);
   return m ? Number(m[1]) : 0;
@@ -49,7 +49,7 @@ class Session {
 
   getStartSequence() {
     const seqs = Object.values(this.viewState).sort((a, b) =>
-      cmp(ps(a), ps(b))
+      cmp(seqNum(a), seqNum(b))
     );
     return seqs.length ? seqs[0] : "0";
   }
@@ -64,10 +64,10 @@ class Session {
 
   async handleBatch(batch, seq) {
     const { name, mdb, viewState } = this;
-    const seqNum = ps(seq);
+    const seqNum = seqNum(seq);
 
     for (const { id, table, view } of this.views) {
-      const st = ps(viewState[id]);
+      const st = seqNum(viewState[id]);
       if (st && st > seqNum) {
         console.log(`${name} - skipping ${id} (${st} > ${seqNum})`);
         continue;
@@ -97,11 +97,11 @@ class Session {
   }
 
   async start() {
-    const { name, mdb, cdb, views } = this;
+    const { name, cdb } = this;
 
     await this.loadViewState();
     const since = this.getStartSequence();
-    console.log(`${name} starting at ${ps(since)}`);
+    console.log(`${name} starting at ${seqNum(since)}`);
 
     await new Promise((resolve, reject) => {
       let nextSeq = null;
@@ -114,10 +114,9 @@ class Session {
           timeout: 10000
         })
         .on("batch", batch => {
-          console.log(`${name} got batch ${ps(nextSeq)}`);
+          console.log(`${name} got batch ${seqNum(nextSeq)}`);
           this.handleBatch(batch, nextSeq)
             .then(() => cdb.changesReader.resume())
-            // .then(() => process.exit(0))
             .catch(reject);
         })
         .on("seq", seq => (nextSeq = seq))
