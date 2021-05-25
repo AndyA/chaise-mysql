@@ -1,0 +1,55 @@
+{
+  "name": "chaise-mysql",
+  "version": "0.0.1",
+  "description": "Live sync from CouchDB to MySQL",
+  "main": "bin/app.js",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndyA/chaise-mysql.git"
+  },
+  "keywords": [
+    "CouchDB",
+    "MySQL",
+    "sync",
+    "replication"
+  ],
+  "author": "Andy Armstrong <andy@hexten.net>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/AndyA/chaise-mysql/issues"
+  },
+  "homepage": "https://github.com/AndyA/chaise-mysql#readme",
+  "engines": {
+    "node": ">=15.0.0"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "useTabs": false,
+    "semi": true,
+    "singleQuote": false,
+    "quoteProps": "consistent",
+    "jsxSingleQuote": false,
+    "trailingComma": "none",
+    "bracketSpacing": true,
+    "jsxBracketSameLine": true,
+    "arrowParens": "avoid",
+    "requirePragma": false,
+    "insertPragma": false,
+    "proseWrap": "preserve",
+    "htmlWhitespaceSensitivity": "css",
+    "endOfLine": "lf"
+  },
+  "dependencies": {
+    "app-module-path": "^2.2.0",
+    "bluebird": "^3.7.2",
+    "express": "^4.17.1",
+    "lodash": "^4.17.21",
+    "mysql2": "^2.2.5",
+    "nano": "^9.0.3",
+    "tap": "^15.0.9"
+  }
+}
