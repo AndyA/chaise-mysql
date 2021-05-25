@@ -39,6 +39,34 @@ LOCK TABLES `_chaise_view_state` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `bandwidth`
+--
+
+DROP TABLE IF EXISTS `bandwidth`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `bandwidth` (
+  `_id` varchar(255) NOT NULL,
+  `mac` varchar(1024) NOT NULL,
+  `time` varchar(30) NOT NULL,
+  `tx_rate` double NOT NULL DEFAULT 0,
+  `rx_rate` double NOT NULL DEFAULT 0,
+  KEY `_id` (`_id`),
+  KEY `mac` (`mac`(768)),
+  KEY `time` (`time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `bandwidth`
+--
+
+LOCK TABLES `bandwidth` WRITE;
+/*!40000 ALTER TABLE `bandwidth` DISABLE KEYS */;
+/*!40000 ALTER TABLE `bandwidth` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `known_devices`
 --
 
@@ -72,4 +100,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-05-25 17:51:22
+-- Dump completed on 2021-05-25 18:42:44

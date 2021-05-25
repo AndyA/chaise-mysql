@@ -8,6 +8,12 @@ const fg = require("fast-glob");
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
+const ps = seq => {
+  if (!seq) return 0;
+  const m = seq.match(/^(\d+)-/);
+  return m ? Number(m[1]) : 0;
+};
+
 async function bulkInsert(db, table, recs) {
   if (recs.length === 0) return;
   const cols = Object.keys(recs[0]);
@@ -24,23 +30,51 @@ class Session {
     this.mdb = mdb;
     this.cdb = cdb;
     this.views = views;
+    this.viewState = null;
   }
 
-  async getStartSequence() {
+  async loadViewState() {
     const ids = this.views.map(v => v.id);
     const [rows] = await this.mdb.query(
       "SELECT * FROM `_chaise_view_state` WHERE `view_id` IN (?)",
-      ids
+      [ids]
     );
-    if (rows.length === 0) return "0"; // start
-    return rows.map(r => r.couch_seq).sort(cmp)[0];
+    this.viewState = Object.assign(
+      Object.fromEntries(ids.map(id => [id, "0"])),
+      Object.fromEntries(
+        rows.map(({ view_id, couch_seq }) => [view_id, couch_seq])
+      )
+    );
+  }
+
+  getStartSequence() {
+    const seqs = Object.values(this.viewState).sort((a, b) =>
+      cmp(ps(a), ps(b))
+    );
+    return seqs.length ? seqs[0] : "0";
+  }
+
+  async setViewState(id, seq) {
+    await this.mdb.query(
+      "REPLACE INTO `_chaise_view_state` (`view_id`, `couch_seq`) VALUES (?, ?)",
+      [id, seq]
+    );
+    this.viewState[id] = seq;
   }
 
   async handleBatch(batch, seq) {
-    const { mdb } = this;
-    // console.log(batch);
+    const { name, mdb, viewState } = this;
+    const seqNum = ps(seq);
+
     for (const { id, table, view } of this.views) {
+      const st = ps(viewState[id]);
+      if (st && st > seqNum) {
+        console.log(`${name} - skipping ${id} (${st} > ${seqNum})`);
+        continue;
+      }
+
       const recs = [];
+      console.log(`${name} - updating ${id}`);
       for (const { doc } of batch) {
         const ctx = { emit: rec => recs.push({ _id: doc._id, ...rec }) };
         view.call(ctx, doc);
@@ -53,10 +87,7 @@ class Session {
           batch.map(o => o.doc._id)
         ]);
         await bulkInsert(mdb, table, recs);
-        await mdb.query(
-          "REPLACE INTO `_chaise_view_state` (`view_id`, `couch_seq`) VALUES (?, ?)",
-          [id, seq]
-        );
+        await this.setViewState(id, seq);
         await mdb.commit();
       } catch (e) {
         await mdb.rollback();
@@ -68,8 +99,9 @@ class Session {
   async start() {
     const { name, mdb, cdb, views } = this;
 
-    const since = await this.getStartSequence();
-    console.log(`starting at ${since}`);
+    await this.loadViewState();
+    const since = this.getStartSequence();
+    console.log(`${name} starting at ${ps(since)}`);
 
     await new Promise((resolve, reject) => {
       let nextSeq = null;
@@ -82,7 +114,7 @@ class Session {
           timeout: 10000
         })
         .on("batch", batch => {
-          console.log(`got batch ${nextSeq}`);
+          console.log(`${name} got batch ${ps(nextSeq)}`);
           this.handleBatch(batch, nextSeq)
             .then(() => cdb.changesReader.resume())
             // .then(() => process.exit(0))
