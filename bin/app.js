@@ -24,6 +24,10 @@ async function bulkInsert(db, table, recs) {
   ]);
 }
 
+async function bulkDelete(db, table, key, ids) {
+  await db.query("DELETE FROM ?? WHERE ?? IN (?)", [table, key, ids]);
+}
+
 class Session {
   constructor(name, mdb, cdb, views) {
     this.name = name;
@@ -64,12 +68,12 @@ class Session {
 
   async handleBatch(batch, seq) {
     const { name, mdb, viewState } = this;
-    const seqNum = seqNum(seq);
+    const hwm = seqNum(seq);
 
     for (const { id, table, view } of this.views) {
       const st = seqNum(viewState[id]);
-      if (st && st > seqNum) {
-        console.log(`${name} - skipping ${id} (${st} > ${seqNum})`);
+      if (st && st > hwm) {
+        console.log(`${name} - skipping ${id} (${st} > ${hwm})`);
         continue;
       }
 
@@ -82,10 +86,8 @@ class Session {
 
       await mdb.beginTransaction();
       try {
-        await mdb.query("DELETE FROM ?? WHERE `_id` IN (?)", [
-          table,
-          batch.map(o => o.doc._id)
-        ]);
+        const ids = batch.map(o => o.doc._id);
+        await bulkDelete(mdb, table, "_id", ids);
         await bulkInsert(mdb, table, recs);
         await this.setViewState(id, seq);
         await mdb.commit();
