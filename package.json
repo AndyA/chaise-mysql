@@ -46,7 +46,9 @@
   "dependencies": {
     "app-module-path": "^2.2.0",
     "bluebird": "^3.7.2",
+    "config": "^3.3.6",
     "express": "^4.17.1",
+    "fast-glob": "^3.2.5",
     "lodash": "^4.17.21",
     "mysql2": "^2.2.5",
     "nano": "^9.0.3",
