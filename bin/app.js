@@ -5,8 +5,10 @@ const nano = require("nano");
 const mysql = require("mysql2/promise");
 const path = require("path");
 const fg = require("fast-glob");
+const moment = require("moment");
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const ts = () => moment().format("YYYY/MM/DD HH:mm:ss");
 
 const seqNum = seq => {
   if (!seq) return 0;
@@ -73,12 +75,12 @@ class Session {
     for (const { id, table, view } of this.views) {
       const st = seqNum(viewState[id]);
       if (st && st > hwm) {
-        console.log(`${name} - skipping ${id} (${st} > ${hwm})`);
+        console.log(`${ts()} ${name} - skipping ${id} (${st} > ${hwm})`);
         continue;
       }
 
       const recs = [];
-      console.log(`${name} - updating ${id}`);
+      console.log(`${ts()} ${name} - updating ${id}`);
       for (const { doc } of batch) {
         const ctx = { emit: rec => recs.push({ _id: doc._id, ...rec }) };
         view.call(ctx, doc);
@@ -103,7 +105,7 @@ class Session {
 
     await this.loadViewState();
     const since = this.getStartSequence();
-    console.log(`${name} starting at ${seqNum(since)}`);
+    console.log(`${ts()} ${name} starting at ${seqNum(since)}`);
 
     await new Promise((resolve, reject) => {
       let nextSeq = null;
@@ -116,7 +118,7 @@ class Session {
           timeout: 10000
         })
         .on("batch", batch => {
-          console.log(`${name} got batch ${seqNum(nextSeq)}`);
+          console.log(`${ts()} ${name} got batch ${seqNum(nextSeq)}`);
           this.handleBatch(batch, nextSeq)
             .then(() => cdb.changesReader.resume())
             .catch(reject);
