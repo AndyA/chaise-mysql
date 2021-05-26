@@ -2,6 +2,8 @@
 
 const isNullish = x => x === undefined || x === null;
 
+const isValid = x => !isNullish(x) && x >= 0;
+
 module.exports = {
   id: "bandwidth",
   table: "bandwidth",
@@ -12,7 +14,7 @@ module.exports = {
         for (const { time, rate } of stats) {
           for (const r of rate) {
             const { tx_rate, rx_rate } = r;
-            if (mac && !isNullish(tx_rate) && !isNullish(rx_rate)) {
+            if (mac && isValid(tx_rate) && isValid(rx_rate)) {
               this.emit({
                 time: new Date(time),
                 mac,
