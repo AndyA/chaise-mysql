@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS `_chaise_view_state`;
 CREATE TABLE `_chaise_view_state` (
   `view_id` varchar(255) NOT NULL,
   `couch_seq` varchar(255) DEFAULT NULL,
+  `last_update` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`view_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -40,13 +41,22 @@ DROP TABLE IF EXISTS `bandwidth`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `bandwidth` (
   `_id` varchar(255) NOT NULL,
-  `mac` varchar(1024) NOT NULL,
-  `time` varchar(30) NOT NULL,
+  `mac` varchar(100) NOT NULL,
+  `time` datetime NOT NULL,
   `tx_rate` double NOT NULL DEFAULT 0,
   `rx_rate` double NOT NULL DEFAULT 0,
+  `total_rate` double GENERATED ALWAYS AS (`tx_rate` + `rx_rate`) STORED,
+  `year` int(10) unsigned GENERATED ALWAYS AS (year(`time`)) STORED,
+  `month` int(10) unsigned GENERATED ALWAYS AS (month(`time`)) STORED,
+  `day` int(10) unsigned GENERATED ALWAYS AS (dayofmonth(`time`)) STORED,
+  `hour` int(10) unsigned GENERATED ALWAYS AS (hour(`time`)) STORED,
   KEY `_id` (`_id`),
-  KEY `mac` (`mac`(768)),
-  KEY `time` (`time`)
+  KEY `mac` (`mac`),
+  KEY `time` (`time`),
+  KEY `year` (`year`),
+  KEY `month` (`month`),
+  KEY `day` (`day`),
+  KEY `hour` (`hour`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 --
@@ -88,4 +98,4 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
--- Dump completed on 2021-05-25 19:16:32
+-- Dump completed on 2021-05-26 16:32:33
