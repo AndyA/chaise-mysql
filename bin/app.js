@@ -2,172 +2,46 @@ require("../use");
 
 const config = require("config");
 const nano = require("nano");
-const mysql = require("mysql2/promise");
 const path = require("path");
 const fg = require("fast-glob");
-const moment = require("moment");
+const Promise = require("bluebird");
+const MySQLDriver = require("lib/driver/mysql");
+const ChaiseSession = require("lib/chaise/session");
 
-const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-const ts = () => moment().format("YYYY/MM/DD HH:mm:ss");
+const getMyDriver = name => MySQLDriver.connect(config.get(`mysql.${name}`));
 
-const seqNum = seq => {
-  if (!seq) return 0;
-  const m = seq.match(/^(\d+)-/);
-  return m ? Number(m[1]) : 0;
-};
-
-async function bulkInsert(db, table, recs) {
-  if (recs.length === 0) return;
-  const cols = Object.keys(recs[0]);
-  await db.query("INSERT INTO ?? (??) VALUES ?", [
-    table,
-    cols,
-    recs.map(rec => cols.map(col => rec[col]))
-  ]);
-}
-
-async function bulkDelete(db, table, key, ids) {
-  await db.query("DELETE FROM ?? WHERE ?? IN (?)", [table, key, ids]);
-}
-
-class Session {
-  constructor(name, mdb, cdb, views) {
-    this.name = name;
-    this.mdb = mdb;
-    this.cdb = cdb;
-    this.views = views;
-    this.viewState = null;
-  }
-
-  async loadViewState() {
-    const ids = this.views.map(v => v.id);
-    const [rows] = await this.mdb.query(
-      "SELECT * FROM `_chaise_view_state` WHERE `view_id` IN (?)",
-      [ids]
-    );
-    this.viewState = Object.assign(
-      Object.fromEntries(ids.map(id => [id, "0"])),
-      Object.fromEntries(
-        rows.map(({ view_id, couch_seq }) => [view_id, couch_seq])
-      )
-    );
-  }
-
-  async setViewState(id, seq) {
-    await this.mdb.query(
-      "REPLACE INTO `_chaise_view_state` (`view_id`, `couch_seq`) VALUES (?, ?)",
-      [id, seq]
-    );
-    this.viewState[id] = seq;
-  }
-
-  getStartSequence() {
-    const seqs = Object.values(this.viewState).sort((a, b) =>
-      cmp(seqNum(a), seqNum(b))
-    );
-    return seqs.length ? seqs[0] : "0";
-  }
-
-  async handleBatch(batch, seq) {
-    const { name, mdb, viewState } = this;
-    const hwm = seqNum(seq);
-
-    for (const { id, table, view } of this.views) {
-      const st = seqNum(viewState[id]);
-      if (st && st > hwm) {
-        console.log(`${ts()} ${name} - skipping ${id} (${st} > ${hwm})`);
-        continue;
-      }
-
-      const recs = [];
-      console.log(`${ts()} ${name} - updating ${id}`);
-      for (const { doc } of batch) {
-        const ctx = { emit: rec => recs.push({ _id: doc._id, ...rec }) };
-        view.call(ctx, doc);
-      }
-
-      await mdb.beginTransaction();
-      try {
-        const ids = batch.map(o => o.doc._id);
-        await bulkDelete(mdb, table, "_id", ids);
-        await bulkInsert(mdb, table, recs);
-        await this.setViewState(id, seq);
-        await mdb.commit();
-      } catch (e) {
-        await mdb.rollback();
-        throw e;
-      }
-    }
-  }
-
-  async start() {
-    const { name, cdb } = this;
-
-    await this.loadViewState();
-    const since = this.getStartSequence();
-    console.log(`${ts()} ${name} starting at ${seqNum(since)}`);
-
-    await new Promise((resolve, reject) => {
-      let nextSeq = null;
-      cdb.changesReader
-        .start({
-          wait: true,
-          since,
-          batchSize: 100,
-          includeDocs: true,
-          timeout: 10000
-        })
-        .on("batch", batch => {
-          console.log(`${ts()} ${name} got batch ${seqNum(nextSeq)}`);
-          this.handleBatch(batch, nextSeq)
-            .then(() => cdb.changesReader.resume())
-            .catch(reject);
-        })
-        .on("seq", seq => (nextSeq = seq))
-        .on("error", reject)
-        .on("end", resolve);
-    });
-  }
-}
-
-const myConnections = {};
-const couchConnections = {};
-
-function getMyConnection(name) {
-  return (myConnections[name] =
-    myConnections[name] || mysql.createConnection(config.get(`mysql.${name}`)));
-}
-
-async function closeMyConnections() {
-  for await (const conn of Object.values(myConnections)) conn.destroy();
-}
-
-function getCouchConnection(name) {
-  return (couchConnections[name] =
-    couchConnections[name] ||
-    Promise.resolve(nano(config.get(`couch.${name}.url`))));
-}
+const getCouchConnection = name =>
+  Promise.resolve(nano(config.get(`couch.${name}.url`)));
 
 async function loadViews(name) {
   const views = await fg(path.join("views", name, "*.js"));
   return views.map(require);
 }
 
-async function main(views) {
+async function makeSessions(views) {
   const sessions = [];
+
   for (const view of views) {
     const viewInfo = config.get(`views.${view}`);
-    const mdb = await getMyConnection(viewInfo.mysql);
     const cdb = await getCouchConnection(viewInfo.couch);
+    const driver = await getMyDriver(viewInfo.mysql);
     const views = await loadViews(view);
-    sessions.push(new Session(view, mdb, cdb, views));
+    sessions.push(new ChaiseSession(view, cdb, driver, views));
   }
 
+  return sessions;
+}
+
+async function main(views) {
+  const sessions = await makeSessions(views);
   try {
-    await Promise.all(sessions.map(s => s.start()));
+    await Promise.all(sessions.map(s => s.run()));
   } finally {
-    await closeMyConnections();
+    await Promise.all(sessions.map(s => s.cleanup()));
   }
 }
 
-main(process.argv.slice(2));
+main(process.argv.slice(2)).catch(e => {
+  console.error(e);
+  process.exit(1);
+});
