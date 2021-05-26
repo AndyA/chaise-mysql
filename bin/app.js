@@ -5,28 +5,28 @@ const nano = require("nano");
 const path = require("path");
 const fg = require("fast-glob");
 const Promise = require("bluebird");
-const MySQLDriver = require("lib/driver/mysql");
+const { loadDriver } = require("lib/driver");
 const ChaiseSession = require("lib/chaise/session");
-
-const getMyDriver = name => MySQLDriver.connect(config.get(`mysql.${name}`));
-
-const getCouchConnection = name =>
-  Promise.resolve(nano(config.get(`couch.${name}.url`)));
 
 async function loadViews(name) {
   const views = await fg(path.join("views", name, "*.js"));
   return views.map(require);
 }
 
+const getDriver = ({ name, flavour }) =>
+  loadDriver(flavour).connect(config.get(`${flavour}.${name}`));
+
 async function makeSessions(views) {
   const sessions = [];
 
   for (const view of views) {
     const viewInfo = config.get(`views.${view}`);
-    const cdb = await getCouchConnection(viewInfo.couch);
-    const driver = await getMyDriver(viewInfo.mysql);
+    const cdb = nano(config.get(`couch.${viewInfo.couch}.url`));
+    const driver = await getDriver(viewInfo.driver);
     const views = await loadViews(view);
-    sessions.push(new ChaiseSession(view, cdb, driver, views));
+    sessions.push(
+      new ChaiseSession(view, cdb, driver, views, viewInfo.options)
+    );
   }
 
   return sessions;

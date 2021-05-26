@@ -16,7 +16,11 @@ module.exports = {
   views: {
     smarthub: {
       couch: "smarthub",
-      mysql: "test"
+      driver: { flavour: "mysql", name: "test" },
+      options: {
+        batchSize: 100,
+        timeout: 10000
+      }
     }
   }
 };
