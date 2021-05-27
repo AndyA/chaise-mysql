@@ -20,9 +20,9 @@ async function makeSessions(views) {
   const sessions = [];
 
   for (const view of views) {
-    const { couch, driver, options } = config.get(`views.${view}`);
+    const { couch, db, options } = config.get(`views.${view}`);
     const cdb = nano(config.get(`couch.${couch}.url`));
-    const outdb = await getConnection(driver);
+    const outdb = await getConnection(db);
     const views = await loadViews(view);
     const session = new ChaiseSession(view, cdb, outdb, views, options);
     sessions.push(session);
