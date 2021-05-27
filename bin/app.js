@@ -13,20 +13,19 @@ async function loadViews(name) {
   return views.map(require);
 }
 
-const getDriver = ({ name, flavour }) =>
+const getConnection = ({ name, flavour }) =>
   loadDriver(flavour).connect(config.get(`${flavour}.${name}`));
 
 async function makeSessions(views) {
   const sessions = [];
 
   for (const view of views) {
-    const viewInfo = config.get(`views.${view}`);
-    const cdb = nano(config.get(`couch.${viewInfo.couch}.url`));
-    const driver = await getDriver(viewInfo.driver);
+    const { couch, driver, options } = config.get(`views.${view}`);
+    const cdb = nano(config.get(`couch.${couch}.url`));
+    const outdb = await getConnection(driver);
     const views = await loadViews(view);
-    sessions.push(
-      new ChaiseSession(view, cdb, driver, views, viewInfo.options)
-    );
+    const session = new ChaiseSession(view, cdb, outdb, views, options);
+    sessions.push(session);
   }
 
   return sessions;
