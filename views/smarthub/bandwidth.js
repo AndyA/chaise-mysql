@@ -1,6 +1,6 @@
 // Smarthub known devices
 
-const isValid = x => !isNaN(x) && x >= 0;
+const isValid = x => x !== null && x !== undefined && x >= 0;
 
 module.exports = {
   id: "bandwidth",
