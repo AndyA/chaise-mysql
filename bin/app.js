@@ -34,7 +34,7 @@ async function makeSessions(views) {
 async function main(views) {
   const sessions = await makeSessions(views);
   try {
-    await Promise.all(sessions.map(s => s.run()));
+    await Promise.all(sessions.map(s => s.start()));
   } finally {
     await Promise.all(sessions.map(s => s.cleanup()));
   }
